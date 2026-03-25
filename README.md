@@ -1,4 +1,4 @@
-# AASd Mfiutil Worker Plugin
+# AASd v2 Mfiutil Worker Plugin
 
 This directory contains a standalone AASd worker plugin repository prepared
 for `mfiutil`-based monitoring tasks on FreeBSD systems.
