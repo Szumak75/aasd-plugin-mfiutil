@@ -89,6 +89,7 @@ class TestMfiutilRuntime(unittest.TestCase):
 
         MfiutilRuntime._battery_state_cache = {}
         MfiutilRuntime._controller_event_cursor = {}
+        MfiutilRuntime._controller_event_limit_cache = {}
         MfiutilRuntime._disk_status_cache = {}
         MfiutilRuntime._locate_flags = {}
         MfiutilRuntime._rebuild_progress_cache = {}
@@ -157,6 +158,64 @@ class TestMfiutilRuntime(unittest.TestCase):
                 runtime.initialize()
 
         self.assertEqual(runtime.state().state, "initialized")
+
+    def test_02a_should_detect_multiple_controller_device_nodes(self) -> None:
+        """Detect multiple controller devices from `/dev/mfi*` and `/dev/mrsas*`."""
+        from plugins.mfiutil.plugin.runtime import MfiutilRuntime
+
+        context = self.__build_context("mfiutil_detect")
+        context.config = {
+            "at_channel": ["1:0;*;*;*;*"],
+            "event_count": 10,
+            "sleep_period": 30.0,
+            "tool_path": "/usr/sbin/mfiutil",
+        }
+        runtime = MfiutilRuntime(context)
+
+        with patch(
+            "plugins.mfiutil.plugin.runtime.glob",
+            side_effect=[
+                ["/dev/mfi1", "/dev/mfi0"],
+                ["/dev/mrsas2"],
+            ],
+        ):
+            controllers = runtime._MfiutilRuntime__detect_controllers()
+
+        self.assertEqual(controllers, ["/dev/mfi0", "/dev/mfi1", "/dev/mrsas2"])
+
+    def test_02b_should_build_commands_with_unit_selector(self) -> None:
+        """Build all controller commands with `-u <unit>` instead of `-D`."""
+        from plugins.mfiutil.plugin.runtime import MfiutilRuntime
+
+        context = self.__build_context("mfiutil_unit")
+        context.config = {
+            "at_channel": ["1:0;*;*;*;*"],
+            "event_count": 10,
+            "sleep_period": 30.0,
+            "tool_path": "/usr/sbin/mfiutil",
+        }
+        runtime = MfiutilRuntime(context)
+        runtime._tool_path = "/usr/sbin/mfiutil"
+        proc = MagicMock()
+        proc.returncode = 0
+        proc.stdout = "adapter output"
+
+        with patch(
+            "plugins.mfiutil.plugin.runtime.subprocess.run",
+            return_value=proc,
+        ) as run_mock:
+            output = runtime._MfiutilRuntime__run_mfiutil(
+                controller="/dev/mfi2",
+                args=["show", "adapter"],
+            )
+
+        self.assertEqual(output, "adapter output")
+        run_mock.assert_called_once_with(
+            ["/usr/sbin/mfiutil", "-u", "2", "show", "adapter"],
+            capture_output=True,
+            check=False,
+            text=True,
+        )
 
     def test_03_should_parse_drive_and_progress_outputs(self) -> None:
         """Parse drive states and rebuild progress from synthetic output."""
@@ -473,6 +532,153 @@ mfi0 Configuration: 7 arrays, 2 volumes, 0 spares
 
         self.assertEqual(len(logger.info_messages), 1)
         self.assertIn("new event #12", logger.info_messages[0])
+
+    def test_04a_should_reduce_event_limit_until_history_query_succeeds(self) -> None:
+        """Adaptively lower `event_count` and cache the first working limit."""
+        from plugins.mfiutil.plugin.runtime import MfiutilRuntime
+
+        context = self.__build_context("mfiutil_event_limit")
+        context.dispatcher.publish = MagicMock()
+        logger = _RecordingLogger()
+        context.logger = logger  # type: ignore[assignment]
+        context.config = {
+            "at_channel": ["6:0;*;*;*;*"],
+            "event_count": 20,
+            "sleep_period": 30.0,
+            "tool_path": "/usr/sbin/mfiutil",
+        }
+        runtime = MfiutilRuntime(context)
+        runtime._tool_path = "/usr/sbin/mfiutil"
+        outputs = {
+            ("show", "adapter"): (
+                "mfi0 Adapter:\n"
+                "    Product Name: LSI MegaRAID SAS 9260-8i\n"
+                "        Firmware: 12.12.0-0124\n"
+                "  Battery Backup: present\n"
+            ),
+            ("show", "battery"): (
+                "mfi0: Battery State:\n"
+                "       Current Charge: 91%\n"
+                "          Temperature: 32 C\n"
+                "      Next learn time: Tue Apr 14 02:58:11 2026\n"
+                "               Status: normal\n"
+                "      State of Health: good\n"
+            ),
+            ("show", "config"): "mfi0 Configuration: 4 arrays, 2 volumes, 0 spares\n",
+            ("show", "volumes"): (
+                "/dev/mfi0 Volumes:\n"
+                "  Id     Size    Level   Stripe  State   Cache   Name\n"
+                " mfid0 (136G) RAID-1 64K OPTIMAL Writes\n"
+            ),
+            ("-e", "show", "drives"): "20 E1:S0 ONLINE healthy drive\n",
+            ("show", "events", "-c", "info", "-n", "10"): (
+                "43865 (Sat Mar 21 21:27:06 CET 2026/CTRL/info) - Patrol Read started\n"
+            ),
+            ("-e", "show", "progress"): "No activity in progress for adapter /dev/mfi0\n",
+            ("locate", "E1:S0", "off"): "",
+        }
+
+        def _run(controller: str, args: List[str]) -> str:
+            if tuple(args) in (
+                ("show", "events", "-c", "info", "-n", "20"),
+                ("show", "events", "-c", "info", "-n", "15"),
+            ):
+                raise RuntimeError(
+                    "mfiutil command failed for controller '/dev/mfi0': "
+                    "mfiutil: Event count is too high"
+                )
+            return outputs[tuple(args)]
+
+        with patch.object(
+            runtime,
+            "_MfiutilRuntime__run_mfiutil",
+            side_effect=_run,
+        ):
+            result = runtime._MfiutilRuntime__diagnose_controller(
+                controller="/dev/mfi0",
+                due_channels=[6],
+            )
+
+        self.assertFalse(result)
+        self.assertFalse(context.dispatcher.publish.called)
+        self.assertEqual(
+            MfiutilRuntime._controller_event_limit_cache[
+                "mfiutil_event_limit:/dev/mfi0"
+            ],
+            10,
+        )
+        self.assertTrue(
+            any("retrying with 10" in item for item in logger.warning_messages)
+        )
+
+    def test_04b_should_continue_without_event_history_when_all_limits_fail(self) -> None:
+        """Continue controller diagnostics even when event history stays unavailable."""
+        from plugins.mfiutil.plugin.runtime import MfiutilRuntime
+
+        context = self.__build_context("mfiutil_event_skip")
+        context.dispatcher.publish = MagicMock()
+        logger = _RecordingLogger()
+        context.logger = logger  # type: ignore[assignment]
+        context.config = {
+            "at_channel": ["6:0;*;*;*;*"],
+            "event_count": 3,
+            "sleep_period": 30.0,
+            "tool_path": "/usr/sbin/mfiutil",
+        }
+        runtime = MfiutilRuntime(context)
+        runtime._tool_path = "/usr/sbin/mfiutil"
+        outputs = {
+            ("show", "adapter"): (
+                "mfi0 Adapter:\n"
+                "    Product Name: LSI MegaRAID SAS 9260-8i\n"
+                "        Firmware: 12.12.0-0124\n"
+                "  Battery Backup: present\n"
+            ),
+            ("show", "battery"): (
+                "mfi0: Battery State:\n"
+                "       Current Charge: 91%\n"
+                "          Temperature: 32 C\n"
+                "      Next learn time: Tue Apr 14 02:58:11 2026\n"
+                "               Status: normal\n"
+                "      State of Health: good\n"
+            ),
+            ("show", "config"): "mfi0 Configuration: 4 arrays, 2 volumes, 0 spares\n",
+            ("show", "volumes"): (
+                "/dev/mfi0 Volumes:\n"
+                "  Id     Size    Level   Stripe  State   Cache   Name\n"
+                " mfid0 (136G) RAID-1 64K OPTIMAL Writes\n"
+            ),
+            ("-e", "show", "drives"): "20 E1:S0 ONLINE healthy drive\n",
+            ("-e", "show", "progress"): "No activity in progress for adapter /dev/mfi0\n",
+            ("locate", "E1:S0", "off"): "",
+        }
+
+        def _run(controller: str, args: List[str]) -> str:
+            if tuple(args[:4]) == ("show", "events", "-c", "info"):
+                raise RuntimeError(
+                    "mfiutil command failed for controller '/dev/mfi0': "
+                    "mfiutil: Event count is too high"
+                )
+            return outputs[tuple(args)]
+
+        with patch.object(
+            runtime,
+            "_MfiutilRuntime__run_mfiutil",
+            side_effect=_run,
+        ):
+            result = runtime._MfiutilRuntime__diagnose_controller(
+                controller="/dev/mfi0",
+                due_channels=[6],
+            )
+
+        self.assertFalse(result)
+        self.assertFalse(context.dispatcher.publish.called)
+        self.assertTrue(
+            any("event history query skipped" in item for item in logger.warning_messages)
+        )
+        self.assertTrue(
+            any("Controller '/dev/mfi0' summary:" in item for item in logger.info_messages)
+        )
 
     def test_05_should_locate_failed_drive_and_publish_alert(self) -> None:
         """Emit a critical alert and enable locate on a newly failed drive."""

@@ -72,6 +72,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
 
     # #[PRIVATE PROPERTIES]###########################################################
     _controller_event_cursor: ClassVar[Dict[str, int]] = {}
+    _controller_event_limit_cache: ClassVar[Dict[str, int]] = {}
     _disk_status_cache: ClassVar[Dict[str, str]] = {}
     _locate_flags: ClassVar[Dict[str, bool]] = {}
     _notifications: Optional[NotificationScheduler] = None
@@ -396,6 +397,14 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         """
         return self._controller_event_cursor
 
+    def __current_event_limits(self) -> Dict[str, int]:
+        """Return the cached per-controller event query limits.
+
+        ### Returns:
+        Dict[str, int] - Cached event-count limits.
+        """
+        return self._controller_event_limit_cache
+
     def __current_locate_states(self) -> Dict[str, bool]:
         """Return the cached locate-flag state map.
 
@@ -419,6 +428,25 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         Dict[str, str] - Cached volume states.
         """
         return self._volume_state_cache
+
+    def __controller_unit(self, controller: str) -> int:
+        """Extract the controller unit number from a device path.
+
+        ### Arguments:
+        * controller: str - Controller device path such as `/dev/mfi0`.
+
+        ### Returns:
+        int - Numeric controller unit.
+
+        ### Raises:
+        * ValueError: If the device path does not contain a supported unit number.
+        """
+        match = re.match(r"^/dev/(?:mfi|mrsas)(\d+)$", controller)
+        if match is None:
+            raise ValueError(
+                f"Unsupported controller device path '{controller}'."
+            )
+        return int(match.group(1))
 
     def __detect_controllers(self) -> List[str]:
         """Detect supported RAID controller device nodes in the system.
@@ -453,17 +481,6 @@ class MfiutilRuntime(Thread, ThPluginMixin):
             controller=controller,
             args=["-e", "show", "drives"],
         )
-        events_output = self.__run_mfiutil(
-            controller=controller,
-            args=[
-                "show",
-                "events",
-                "-c",
-                "info",
-                "-n",
-                str(int(context.config[Keys.EVENT_COUNT])),
-            ],
-        )
         progress_output = self.__run_mfiutil(
             controller=controller,
             args=["-e", "show", "progress"],
@@ -481,7 +498,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
                 f"Controller '{controller}' summary: {', '.join(summary_parts)}"
             )
         battery_info = self.__parse_battery(output=battery_output)
-        events = self.__parse_events(output=events_output)
+        events = self.__load_events(controller=controller)
         self.__log_battery_state(
             controller=controller,
             battery_state=battery_info["summary"],
@@ -698,6 +715,59 @@ class MfiutilRuntime(Thread, ThPluginMixin):
                 )
         event_cursors[cursor_key] = max_seq
 
+    def __load_events(self, controller: str) -> List[Tuple[int, str]]:
+        """Load controller events with adaptive fallback for query limits.
+
+        ### Arguments:
+        * controller: str - Controller device path.
+
+        ### Returns:
+        List[Tuple[int, str]] - Parsed controller events or an empty list when
+        history cannot be retrieved.
+        """
+        context: Optional[PluginContext] = self._context
+        if context is None:
+            raise ValueError("Plugin context is not initialized.")
+        configured_limit = int(context.config[Keys.EVENT_COUNT])
+        event_limits = self.__current_event_limits()
+        limit = event_limits.get(
+            f"{context.instance_name}:{controller}",
+            configured_limit,
+        )
+        while limit >= 1:
+            try:
+                events_output = self.__run_mfiutil(
+                    controller=controller,
+                    args=[
+                        "show",
+                        "events",
+                        "-c",
+                        "info",
+                        "-n",
+                        str(limit),
+                    ],
+                )
+                event_limits[f"{context.instance_name}:{controller}"] = limit
+                return self.__parse_events(output=events_output)
+            except RuntimeError as ex:
+                if "Event count is too high" not in str(ex):
+                    context.logger.message_warning = (
+                        f"Controller '{controller}' event history query failed: {ex}"
+                    )
+                    return []
+                next_limit = self.__next_event_limit(limit)
+                if next_limit is None:
+                    context.logger.message_warning = (
+                        f"Controller '{controller}' event history query skipped: {ex}"
+                    )
+                    return []
+                context.logger.message_warning = (
+                    f"Controller '{controller}' event history limit {limit} is too high; "
+                    f"retrying with {next_limit}."
+                )
+                limit = next_limit
+        return []
+
     def __normalize_disk_key(self, controller: str, drive: Dict[str, str]) -> str:
         """Build a stable cache key for one controller drive entry.
 
@@ -713,6 +783,24 @@ class MfiutilRuntime(Thread, ThPluginMixin):
             raise ValueError("Plugin context is not initialized.")
         drive_ref = drive.get("slot", "") or drive.get("id", "") or drive.get("raw", "")
         return f"{context.instance_name}:{controller}:{drive_ref}"
+
+    def __next_event_limit(self, current_limit: int) -> Optional[int]:
+        """Return the next lower event limit candidate.
+
+        ### Arguments:
+        * current_limit: int - Current event-count limit.
+
+        ### Returns:
+        Optional[int] - Lower candidate limit or `None` when exhausted.
+        """
+        if current_limit <= 1:
+            return None
+        if current_limit > 10:
+            next_limit = current_limit - 5
+            if next_limit < 10:
+                return 10
+            return next_limit
+        return current_limit - 1
 
     def __parse_battery(self, output: str) -> Dict[str, str]:
         """Parse the battery status from command output.
@@ -942,8 +1030,9 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         """
         if self._tool_path is None:
             raise RuntimeError("mfiutil command path is not initialized.")
+        unit = self.__controller_unit(controller)
         proc = subprocess.run(
-            [self._tool_path, "-D", controller] + args,
+            [self._tool_path, "-u", str(unit)] + args,
             capture_output=True,
             check=False,
             text=True,

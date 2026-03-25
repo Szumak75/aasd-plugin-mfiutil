@@ -49,7 +49,7 @@ def get_plugin_spec() -> PluginSpec:
             PluginConfigField(
                 name=Keys.EVENT_COUNT,
                 field_type=int,
-                default=50,
+                default=10,
                 required=True,
                 description="Maximum number of controller events read on each diagnostic pass.",
             ),

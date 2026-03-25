@@ -2,6 +2,43 @@
 
 All notable changes to this plugin repository are documented in this file.
 
+## [0.3.4] - 2026-03-25
+
+### Changed
+- Switched `plugins/mfiutil/plugin/runtime.py` from the newer `-D <device>`
+  selector to the cross-version `-u <unit>` syntax while keeping controller
+  discovery based on `/dev/mfi*` and `/dev/mrsas*` device nodes.
+- Added regression coverage in `plugins/mfiutil/tests/test_runtime.py` for
+  multi-controller device detection and `-u <unit>` command construction.
+- Updated `plugins/mfiutil/README.md` to document the cross-version command
+  strategy.
+
+### Versioning
+- Bumped local plugin version to `0.3.4` in `plugins/mfiutil/plugin/__init__.py`.
+
+## [0.3.3] - 2026-03-25
+
+### Changed
+- Hardened `plugins/mfiutil/plugin/runtime.py` so that `show events` uses an
+  adaptive fallback when a controller rejects the configured `event_count`
+  value with `Event count is too high`.
+- Lowered the default `event_count` in `plugins/mfiutil/load.py` from `50` to
+  `10`, matching observed controller compatibility while keeping the adaptive
+  fallback path for stricter firmware variants.
+- Cached the first working event-history limit per controller instance to avoid
+  repeating oversized queries on later diagnostic passes.
+- Changed event-history failures to warning-only behavior so adapter, battery,
+  volume, drive, and progress diagnostics still complete when historical event
+  reads remain unavailable.
+- Added regression coverage in `plugins/mfiutil/tests/test_runtime.py` for
+  adaptive event-limit fallback and continuation of diagnostics when event
+  history must be skipped.
+- Updated `plugins/mfiutil/README.md` to document adaptive event-count fallback
+  and non-blocking event-history failures.
+
+### Versioning
+- Bumped local plugin version to `0.3.3` in `plugins/mfiutil/plugin/__init__.py`.
+
 ## [0.3.2] - 2026-03-25
 
 ### Changed

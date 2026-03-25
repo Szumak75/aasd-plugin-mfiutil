@@ -1,0 +1,497 @@
+MFIUTIL(8)              FreeBSD System Manager's Manual             MFIUTIL(8)
+
+NNAAMMEE
+     mmffiiuuttiill – Utility for managing LSI MegaRAID SAS controllers
+
+SSYYNNOOPPSSIISS
+     mmffiiuuttiill vveerrssiioonn
+     mmffiiuuttiill [--uu _u_n_i_t] sshhooww aaddaapptteerr
+     mmffiiuuttiill [--uu _u_n_i_t] sshhooww bbaatttteerryy
+     mmffiiuuttiill [--dd] [--ee] [--uu _u_n_i_t] sshhooww ccoonnffiigg
+     mmffiiuuttiill [--uu _u_n_i_t] sshhooww ddrriivveess
+     mmffiiuuttiill [--uu _u_n_i_t] sshhooww eevveennttss [--cc _c_l_a_s_s] [--ll _l_o_c_a_l_e] [--nn _c_o_u_n_t] [--vv]
+             [_s_t_a_r_t [_s_t_o_p]]
+     mmffiiuuttiill [--uu _u_n_i_t] sshhooww ffiirrmmwwaarree
+     mmffiiuuttiill [--uu _u_n_i_t] sshhooww ffoorreeiiggnn [_v_o_l_u_m_e]
+     mmffiiuuttiill [--uu _u_n_i_t] sshhooww llooggssttaattee
+     mmffiiuuttiill [--dd] [--ee] [--uu _u_n_i_t] sshhooww ppaattrrooll
+     mmffiiuuttiill [--dd] [--ee] [--uu _u_n_i_t] sshhooww pprrooggrreessss
+     mmffiiuuttiill [--uu _u_n_i_t] sshhooww vvoolluummeess
+     mmffiiuuttiill [--uu _u_n_i_t] ffaaiill _d_r_i_v_e
+     mmffiiuuttiill [--uu _u_n_i_t] ggoooodd _d_r_i_v_e
+     mmffiiuuttiill [--uu _u_n_i_t] rreebbuuiilldd _d_r_i_v_e
+     mmffiiuuttiill [--uu _u_n_i_t] ssyyssppdd _d_r_i_v_e
+     mmffiiuuttiill [--uu _u_n_i_t] ddrriivvee pprrooggrreessss _d_r_i_v_e
+     mmffiiuuttiill [--uu _u_n_i_t] ddrriivvee cclleeaarr _d_r_i_v_e {start | stop}
+     mmffiiuuttiill [--uu _u_n_i_t] ssttaarrtt rreebbuuiilldd _d_r_i_v_e
+     mmffiiuuttiill [--uu _u_n_i_t] aabboorrtt rreebbuuiilldd _d_r_i_v_e
+     mmffiiuuttiill [--uu _u_n_i_t] llooccaattee _d_r_i_v_e {on | off}
+     mmffiiuuttiill [--uu _u_n_i_t] ccaacchhee _v_o_l_u_m_e [_s_e_t_t_i_n_g [_v_a_l_u_e] [...]]
+     mmffiiuuttiill [--uu _u_n_i_t] nnaammee _v_o_l_u_m_e _n_a_m_e
+     mmffiiuuttiill [--uu _u_n_i_t] vvoolluummee pprrooggrreessss _v_o_l_u_m_e
+     mmffiiuuttiill [--uu _u_n_i_t] cclleeaarr
+     mmffiiuuttiill [--uu _u_n_i_t] ccrreeaattee _t_y_p_e [--vv] [--ss _s_t_r_i_p_e___s_i_z_e] _d_r_i_v_e[,_d_r_i_v_e[,...]]
+             [_d_r_i_v_e[,_d_r_i_v_e[,...]]]
+     mmffiiuuttiill [--uu _u_n_i_t] ddeelleettee _v_o_l_u_m_e
+     mmffiiuuttiill [--uu _u_n_i_t] aadddd _d_r_i_v_e [_v_o_l_u_m_e]
+     mmffiiuuttiill [--uu _u_n_i_t] rreemmoovvee _d_r_i_v_e
+     mmffiiuuttiill [--uu _u_n_i_t] ssttaarrtt ppaattrrooll
+     mmffiiuuttiill [--uu _u_n_i_t] ssttoopp ppaattrrooll
+     mmffiiuuttiill [--uu _u_n_i_t] ppaattrrooll _c_o_m_m_a_n_d [_i_n_t_e_r_v_a_l [_s_t_a_r_t]]
+     mmffiiuuttiill [--uu _u_n_i_t] ffoorreeiiggnn ssccaann
+     mmffiiuuttiill [--uu _u_n_i_t] ffoorreeiiggnn cclleeaarr [_c_o_n_f_i_g]
+     mmffiiuuttiill [--uu _u_n_i_t] ffoorreeiiggnn ddiiaagg [_c_o_n_f_i_g]
+     mmffiiuuttiill [--uu _u_n_i_t] ffoorreeiiggnn pprreevviieeww [_c_o_n_f_i_g]
+     mmffiiuuttiill [--uu _u_n_i_t] ffoorreeiiggnn iimmppoorrtt [_c_o_n_f_i_g]
+     mmffiiuuttiill [--uu _u_n_i_t] ffllaasshh _f_i_l_e
+     mmffiiuuttiill [--uu _u_n_i_t] ssttaarrtt lleeaarrnn
+     mmffiiuuttiill [--uu _u_n_i_t] bbbbuu _s_e_t_t_i_n_g _v_a_l_u_e
+     mmffiiuuttiill [--uu _u_n_i_t] ccttrrllpprroopp _r_e_b_u_i_l_d [_r_a_t_e]
+     mmffiiuuttiill [--uu _u_n_i_t] ccttrrllpprroopp _a_l_a_r_m [_0_/_1]
+
+DDEESSCCRRIIPPTTIIOONN
+     The mmffiiuuttiill utility can be used to display or modify various parameters
+     on LSI MegaRAID SAS RAID controllers.  Each invocation of mmffiiuuttiill
+     consists of zero or more global options followed by a command.  Commands
+     may support additional optional or required arguments after the command.
+
+     Currently one global option is supported:
+
+     --uu _u_n_i_t
+             _u_n_i_t specifies the unit of the controller to work with.  If no
+             unit is specified, then unit 0 is used.
+
+     Various commands accept either or both of the two options:
+
+     --dd      Print numeric device IDs as drive identifier.  This is the
+             default.  Useful in combination with --ee to print both, numeric
+             device IDs and enclosure:slot information.
+
+     --ee      Print drive identifiers in enclosure:slot form.  See next
+             paragraph on format details in context of input rather than
+             output.
+
+     Drives may be specified in two forms.  First, a drive may be identified
+     by its device ID.  The device ID for configured drives can be found in
+     sshhooww ccoonnffiigg.  Second, a drive may be identified by its location as
+     [E_x_x:]S_y_y where _x_x is the enclosure and _y_y is the slot for each drive as
+     displayed in sshhooww ddrriivveess.
+
+     Volumes may be specified in two forms.  First, a volume may be identified
+     by its target ID.  Second, on the volume may be specified by the
+     corresponding _m_f_i_d_X device, such as _m_f_i_d_0.
+
+     The mmffiiuuttiill utility supports several different groups of commands.  The
+     first group of commands provide information about the controller, the
+     volumes it manages, and the drives it controls.  The second group of
+     commands are used to manage the physical drives attached to the
+     controller.  The third group of commands are used to manage the logical
+     volumes managed by the controller.  The fourth group of commands are used
+     to manage the drive configuration for the controller.  The fifth group of
+     commands are used to manage controller-wide operations.
+
+     The informational commands include:
+
+     vveerrssiioonn
+             Displays the version of mmffiiuuttiill.
+
+     sshhooww aaddaapptteerr
+             Displays information about the RAID controller such as the model
+             number.
+
+     sshhooww bbaatttteerryy
+             Displays information about the battery from the battery backup
+             unit.
+
+     sshhooww ccoonnffiigg
+             Displays the volume and drive configuration for the controller.
+             Each array is listed along with the physical drives the array is
+             built from.  Each volume is listed along with the arrays that the
+             volume spans.  If any hot spare drives are configured, then they
+             are listed as well.
+
+     sshhooww ddrriivveess
+             Lists all of the physical drives attached to the controller.
+
+     sshhooww eevveennttss [--cc _c_l_a_s_s] [--ll _l_o_c_a_l_e] [--nn _c_o_u_n_t] [--vv] [_s_t_a_r_t [_s_t_o_p]]
+             Display entries from the controller's event log.  The controller
+             maintains a circular buffer of events.  Each event is tagged with
+             a class and locale.
+
+             The _c_l_a_s_s parameter limits the output to entries at the specified
+             class or higher.  The default class is “warn”.  The available
+             classes from lowest priority to highest are:
+
+             ddeebbuugg   Debug messages.
+
+             pprrooggrreessss
+                     Periodic progress updates for long-running operations
+                     such as background initializations, array rebuilds, or
+                     patrol reads.
+
+             iinnffoo    Informational messages such as drive insertions and
+                     volume creations.
+
+             wwaarrnn    Indicates that some component may be close to failing.
+
+             ccrriitt    A component has failed, but no data is lost.  For
+                     example, a volume becoming degraded due to a drive
+                     failure.
+
+             ffaattaall   A component has failed resulting in data loss.
+
+             ddeeaadd    The controller itself has died.
+
+             The _l_o_c_a_l_e parameter limits the output to entries for the
+             specified part of the controller.  The default locale is “all”.
+             The available locales are “volume”, “drive”, “enclosure”,
+             “battery”, “sas”, “controller”, “config”, “cluster”, and “all”.
+
+             The _c_o_u_n_t parameter is a debugging aid that specifies the number
+             of events to fetch from the controller for each low-level
+             request.  The default is 15 events.
+
+             By default, matching event log entries from the previous shutdown
+             up to the present are displayed.  This range can be adjusted via
+             the _s_t_a_r_t and _s_t_o_p parameters.  Each of these parameters can
+             either be specified as a log entry number or as one of the
+             following aliases:
+
+             nneewweesstt  The newest entry in the event log.
+
+             oollddeesstt  The oldest entry in the event log.
+
+             cclleeaarr   The first entry since the event log was cleared.
+
+             sshhuuttddoowwnn
+                     The entry in the event log corresponding to the last time
+                     the controller was cleanly shut down.
+
+             bboooott    The entry in the event log corresponding to the most
+                     recent boot.
+
+     sshhooww ffiirrmmwwaarree
+             Lists all of the firmware images present on the controller.
+
+     sshhooww ffoorreeiiggnn
+             Displays detected foreign configurations on disks for importation
+             or removal.
+
+     sshhooww llooggssttaattee
+             Display the various sequence numbers associated with the event
+             log.
+
+     sshhooww ppaattrrooll
+             Display the status of the controller's patrol read operation.
+
+     sshhooww pprrooggrreessss
+             Report the current progress and estimated completion time for
+             active operations on all volumes and drives.
+
+     sshhooww vvoolluummeess
+             Lists all of the logical volumes managed by the controller.
+
+     The physical drive management commands include:
+
+     ffaaiill _d_r_i_v_e
+             Mark _d_r_i_v_e as failed.  _D_r_i_v_e must be an online drive that is part
+             of an array.
+
+     ggoooodd _d_r_i_v_e
+             Mark _d_r_i_v_e as an unconfigured good drive.  _D_r_i_v_e must not be part
+             of an existing array.
+
+     rreebbuuiilldd _d_r_i_v_e
+             Mark a failed _d_r_i_v_e that is still part of an array as a good
+             drive suitable for a rebuild.  The firmware should kick off an
+             array rebuild on its own if a failed drive is marked as a rebuild
+             drive.
+
+     ssyyssppdd _d_r_i_v_e
+             Present the drive to the host operating system as a disk SYSPD
+             block device in the format /dev/mfisyspdX.  Clear this flag with
+             ggoooodd _d_r_i_v_e
+
+     ddrriivvee pprrooggrreessss _d_r_i_v_e
+             Report the current progress and estimated completion time of
+             drive operations such as rebuilds or patrol reads.
+
+     ddrriivvee cclleeaarr _d_r_i_v_e {start | stop}
+             Start or stop the writing of all 0x00 characters to a drive.
+
+     ssttaarrtt rreebbuuiilldd _d_r_i_v_e
+             Manually start a rebuild on _d_r_i_v_e.
+
+     aabboorrtt rreebbuuiilldd _d_r_i_v_e
+             Abort an in-progress rebuild operation on _d_r_i_v_e.  It can be
+             resumed with the ssttaarrtt rreebbuuiilldd command.
+
+     llooccaattee _d_r_i_v_e {on | off}
+             Change the state of the external LED associated with _d_r_i_v_e.
+
+     The logical volume management commands include:
+
+     ccaacchhee _v_o_l_u_m_e [_s_e_t_t_i_n_g [_v_a_l_u_e] [...]]
+             If no _s_e_t_t_i_n_g arguments are supplied, then the current cache
+             policy for _v_o_l_u_m_e is displayed; otherwise, the cache policy for
+             _v_o_l_u_m_e is modified.  One or more _s_e_t_t_i_n_g arguments may be given.
+             Some settings take an additional _v_a_l_u_e argument as noted below.
+             The valid settings are:
+
+             eennaabbllee  Enable caching for both read and write I/O operations.
+
+             ddiissaabbllee
+                     Disable caching for both read and write I/O operations.
+
+             rreeaaddss   Enable caching only for read I/O operations.
+
+             wwrriitteess  Enable caching only for write I/O operations.
+
+             wwrriittee--bbaacckk
+                     Use write-back policy for cached writes.
+
+             wwrriittee--tthhrroouugghh
+                     Use write-through policy for cached writes.
+
+             rreeaadd--aahheeaadd _v_a_l_u_e
+                     Set the read ahead policy for cached reads.  The _v_a_l_u_e
+                     argument can be set to either “none”, “adaptive”, or
+                     “always”.
+
+             bbaadd--bbbbuu--wwrriittee--ccaacchhee _v_a_l_u_e
+                     Control the behavior of I/O write caching if the battery
+                     is dead or missing.  The _v_a_l_u_e argument can be set to
+                     either “disable” or “enable”.  In general this setting
+                     should be left disabled to avoid data loss when the
+                     system loses power.
+
+             wwrriittee--ccaacchhee _v_a_l_u_e
+                     Control the write caches on the physical drives backing
+                     _v_o_l_u_m_e.  The _v_a_l_u_e argument can be set to either
+                     “disable”, “enable”, or “default”.
+
+                     In general this setting should be left disabled to avoid
+                     data loss when the physical drives lose power.  The
+                     battery backup of the RAID controller does not save data
+                     in the write caches of the physical drives.
+
+     nnaammee _v_o_l_u_m_e _n_a_m_e
+             Sets the name of _v_o_l_u_m_e to _n_a_m_e.
+
+     vvoolluummee pprrooggrreessss _v_o_l_u_m_e
+             Report the current progress and estimated completion time of
+             volume operations such as consistency checks and initializations.
+
+     The configuration commands include:
+
+     cclleeaarr   Delete the entire configuration including all volumes, arrays,
+             and spares.
+
+     ccrreeaattee _t_y_p_e [--vv] [--ss _s_t_r_i_p_e___s_i_z_e] _d_r_i_v_e[,_d_r_i_v_e[,...]]
+             [_d_r_i_v_e[,_d_r_i_v_e[,...]]]
+             Create a new volume.  The _t_y_p_e specifies the type of volume to
+             create.  Currently supported types include:
+
+             jjbboodd    Creates a RAID0 volume for each drive specified.  Each
+                     drive must be specified as a separate argument.
+
+             rraaiidd00   Creates one RAID0 volume spanning the drives listed in
+                     the single drive list.
+
+             rraaiidd11   Creates one RAID1 volume spanning the drives listed in
+                     the single drive list.
+
+             rraaiidd55   Creates one RAID5 volume spanning the drives listed in
+                     the single drive list.
+
+             rraaiidd66   Creates one RAID6 volume spanning the drives listed in
+                     the single drive list.
+
+             rraaiidd1100  Creates one RAID10 volume spanning multiple RAID1 arrays.
+                     The drives for each RAID1 array are specified as a single
+                     drive list.
+
+             rraaiidd5500  Creates one RAID50 volume spanning multiple RAID5 arrays.
+                     The drives for each RAID5 array are specified as a single
+                     drive list.
+
+             rraaiidd6600  Creates one RAID60 volume spanning multiple RAID6 arrays.
+                     The drives for each RAID6 array are specified as a single
+                     drive list.
+
+             ccoonnccaatt  Creates a single volume by concatenating all of the
+                     drives in the single drive list.
+
+             NNoottee:: Not all volume types are supported by all controllers.
+
+             If the --vv flag is specified after _t_y_p_e, then more verbose output
+             will be enabled.  Currently this just provides notification as
+             drives are added to arrays and arrays to volumes when building
+             the configuration.
+
+             The --ss _s_t_r_i_p_e___s_i_z_e parameter allows the stripe size of the array
+             to be set.  By default a stripe size of 64K is used.  Valid
+             values are 512 through 1M, though the MFI firmware may reject
+             some values.
+
+     ddeelleettee _v_o_l_u_m_e
+             Delete the volume _v_o_l_u_m_e.
+
+     aadddd _d_r_i_v_e [_v_o_l_u_m_e]
+             Mark _d_r_i_v_e as a hot spare.  _D_r_i_v_e must be in the unconfigured
+             good state.  If _v_o_l_u_m_e is specified, then the hot spare will be
+             dedicated to arrays backing that volume.  Otherwise, _d_r_i_v_e will
+             be used as a global hot spare backing all arrays for this
+             controller.  Note that _d_r_i_v_e must be as large as the smallest
+             drive in all of the arrays it is going to back.
+
+     rreemmoovvee _d_r_i_v_e
+             Remove the hot spare _d_r_i_v_e from service.  It will be placed in
+             the unconfigured good state.
+
+     The controller management commands include:
+
+     ppaattrrooll _c_o_m_m_a_n_d [_i_n_t_e_r_v_a_l [_s_t_a_r_t]]
+             Set the patrol read operation mode.  The _c_o_m_m_a_n_d argument can be
+             one of the following values:
+
+             ddiissaabbllee
+                     Disable patrol reads.
+
+             aauuttoo    Enable periodic patrol reads initiated by the firmware.
+                     The optional _i_n_t_e_r_v_a_l argument specifies the interval in
+                     seconds between patrol reads.  If patrol reads should be
+                     run continuously, then _i_n_t_e_r_v_a_l should consist of the
+                     word “continuously”.  The optional _s_t_a_r_t argument
+                     specifies a non-negative, relative start time for the
+                     next patrol read.  If an interval or start time is not
+                     specified, then the existing setting will be used.
+
+             mmaannuuaall  Enable manual patrol reads that are only initiated by the
+                     user.
+
+     ssttaarrtt ppaattrrooll
+             Start a patrol read operation.
+
+     ssttoopp ppaattrrooll
+             Stop a currently running patrol read operation.
+
+     ffoorreeiiggnn ssccaann
+             Scan for foreign configurations and display the number found. The
+             _c_o_n_f_i_g argument for the commands below takes the form of a number
+             from 0 to the total configurations found.
+
+     ffoorreeiiggnn cclleeaarr [config]
+             Clear the specified foreign _c_o_n_f_i_g or all if no _c_o_n_f_i_g argument
+             is provided.
+
+     ffoorreeiiggnn ddiiaagg [config]
+             Display a diagnostic display of the specified foreign _c_o_n_f_i_g or
+             all if no _c_o_n_f_i_g argument is provided.
+
+     ffoorreeiiggnn pprreevviieeww [config]
+             Preview the specified foreign _c_o_n_f_i_g after import or all if no
+             _c_o_n_f_i_g argument is provided.
+
+     ffoorreeiiggnn iimmppoorrtt [config]
+             Import the specified foreign _c_o_n_f_i_g or all if no _c_o_n_f_i_g argument
+             is provided.
+
+     ffllaasshh _f_i_l_e
+             Updates the flash on the controller with the firmware stored in
+             _f_i_l_e.  A reboot is required for the new firmware to take effect.
+
+     ssttaarrtt lleeaarrnn
+             Start a battery relearn.  Note that this seems to always result
+             in the battery being completely drained, regardless of the BBU
+             mode.  In particular, the controller write cache will be disabled
+             during the relearn even if transparent learning mode is enabled.
+
+     bbbbuu _s_e_t_t_i_n_g _v_a_l_u_e
+             Update battery backup unit (BBU) properties related to battery
+             relearning.  The following settings are configurable:
+
+             lleeaarrnn--ddeellaayy
+                     Add a delay to the next scheduled battery relearn event.
+                     This setting is given in hours and must lie in the range
+                     of 0 to 255.
+
+             aauuttoolleeaarrnn--mmooddee
+                     Enable or disable automatic periodic battery relearning.
+                     The setting may be set to “enable” or “disable” to
+                     respectively enable or disable the relearn cycle.
+                     Alternatively, a mode of 0, 1 or 2 may be given.  Mode 0
+                     enables periodic relearning, mode 1 disables it, and mode
+                     2 disables it and logs a warning to the event log when it
+                     detects that a battery relearn should be performed.
+
+             bbbbuu--mmooddee
+                     Set the BBU's mode of operation. This setting is not
+                     supported by all BBUs.  Where it is supported, the
+                     possible values are the integers between 1 and 5
+                     inclusive.  Modes 1, 2 and 3 enable a transparent learn
+                     cycle, whereas modes 4 and 5 do not.  The BBU's data
+                     retention time is greater when transparent learning is
+                     not used.
+
+     ccttrrllpprroopp _r_e_b_u_i_l_d [_r_a_t_e]
+             With no arguments display the rate of rebuild (percentage)a for
+             volumes.  With an integer argument (0-100), set that value as the
+             new rebuild rate for volumes.
+
+     ccttrrllpprroopp _a_l_a_r_m [_0_/_1]
+             With no arguments display the current alarm enable/disable
+             status.  With a 0, disable alarms.  With a 1, enable alarms.
+
+EEXXAAMMPPLLEESS
+     Configure the cache for volume mfid0 to cache only writes:
+
+           mmffiiuuttiill ccaacchhee mmffiidd00 wwrriitteess
+           mmffiiuuttiill ccaacchhee mmffiidd00 wwrriittee--bbaacckk
+
+     Create a RAID5 array spanning the first four disks in the second
+     enclosure:
+
+           mmffiiuuttiill ccrreeaattee rraaiidd55 ee11::ss00,,ee11::ss11,,ee11::ss22,,ee11::ss44
+
+     Configure the first three disks on a controller as JBOD:
+
+           mmffiiuuttiill ccrreeaattee jjbboodd 00 11 22
+
+     Create a RAID10 volume that spans two arrays each of which contains two
+     disks from two different enclosures:
+
+           mmffiiuuttiill ccrreeaattee rraaiidd1100 ee11::ss00,,ee11::ss11 ee22::ss00,,ee22::ss11
+
+     Add drive with the device ID of 4 as a global hot spare:
+
+           mmffiiuuttiill aadddd 44
+
+     Add the drive in slot 2 in the main chassis as a hot spare for volume
+     mfid0:
+
+           mmffiiuuttiill aadddd ss22 mmffiidd00
+
+     Reconfigure a disk as a SYSPD block device with no RAID
+
+           mmffiiuuttiill ssyyssppdd 00
+
+     Configure the adapter to run periodic patrol reads once a week with the
+     first patrol read starting in 5 minutes:
+
+           mmffiiuuttiill ppaattrrooll aauuttoo 660044880000 330000
+
+     Display the second detected foreign configuration:
+
+           mmffiiuuttiill sshhooww ffoorreeiiggnn 11
+
+     Set the current rebuild rate for volumes to 40%:
+           mmffiiuuttiill ccttrrllpprroopp rreebbuuiilldd 4400
+
+SSEEEE AALLSSOO
+     mfi(4)
+
+HHIISSTTOORRYY
+     The mmffiiuuttiill utility first appeared in FreeBSD 8.0.
+
+FreeBSD 13.1-RELEASE-p9        September 2, 2011       FreeBSD 13.1-RELEASE-p9

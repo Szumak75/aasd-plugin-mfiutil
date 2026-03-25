@@ -27,6 +27,8 @@ The current implementation:
 
 - auto-discovers `mfiutil` in standard FreeBSD system locations and `PATH`,
 - detects one or more supported controllers from `/dev/mfi*` and `/dev/mrsas*`,
+- executes controller commands through the cross-version `mfiutil -u <unit>`
+  syntax derived from the detected device node,
 - parses realistic FreeBSD `mfiutil` output variants seen across controller and
   system versions, including `/dev/mfiX` headers and mixed SATA/SAS/SCSI drive
   descriptions,
@@ -40,6 +42,9 @@ The current implementation:
   progress updates,
 - logs battery status and newly observed controller events without channel
   notifications,
+- adaptively lowers the `show events` query limit when a controller rejects the
+  configured `event_count` value and remembers the first working limit per
+  controller for later passes,
 - actively forces `locate on` for every drive whose current status is not
   `ONLINE`,
 - actively forces `locate off` for every drive whose current status is
@@ -54,7 +59,8 @@ The plugin currently exposes the following configuration fields:
 
 - `at_channel` - cron-like schedule driving diagnostics and channel delivery
 - `sleep_period` - polling interval between schedule checks
-- `event_count` - maximum number of controller events read per diagnostic pass
+- `event_count` - maximum number of controller events read per low-level event
+  fetch request, default `10`
 - `tool_path` - optional explicit path to `mfiutil`
 
 ## Notification Rules
@@ -74,7 +80,10 @@ without a battery are treated as valid hardware variants and are logged as
 Battery warnings such as suspended charging caused by high battery temperature
 are also kept in logs only unless current battery health becomes bad. Event log
 entries are treated as historical diagnostics only and do not define current
-controller health by themselves.
+controller health by themselves. If `mfiutil show events` rejects the current
+`event_count` with `Event count is too high`, the plugin retries with lower
+limits and, if needed, skips event history while continuing the remaining
+controller diagnostics.
 
 Because `mfiutil` does not expose a read command for current `locate` state, the
 plugin uses an operational simplification: every pass reconciles `locate`
