@@ -32,7 +32,7 @@ def get_plugin_spec() -> PluginSpec:
             PluginConfigField(
                 name=PluginCommonKeys.AT_CHANNEL,
                 field_type=list,
-                default=["1:0;*/5;*;*;*"],
+                default=["1:0;0|6|12|18;*;*;*"],
                 required=True,
                 description=(
                     "Cron-like notification targets used for scheduled controller "
