@@ -1120,8 +1120,65 @@ mfi0 Configuration: 7 arrays, 2 volumes, 0 spares
         self.assertFalse(context.dispatcher.publish.called)
         self.assertTrue(any("DRIVE/FATAL" in item for item in logger.info_messages))
 
-    def test_12_should_deduplicate_diagnostics_within_one_schedule_slot(self) -> None:
-        """Run diagnostics only once within the same matching minute."""
+    def test_12_should_run_immediate_startup_scan_before_next_schedule_slot(self) -> None:
+        """Run one startup diagnostic pass before the next scheduled slot is due."""
+        from plugins.mfiutil.plugin.runtime import MfiutilRuntime
+
+        class _Notifications(object):
+            """Provide deterministic due-channel responses."""
+
+            has_schedule: bool = True
+
+            def due_channels(self) -> List[int]:
+                """Return no due channels for the current loop iteration."""
+                return []
+
+        class _StopEvent(Event):
+            """Provide a controllable stop event stub."""
+
+            def __init__(self) -> None:
+                """Initialize the stop event stub."""
+                super().__init__()
+                self.wait_calls: List[float] = []
+
+            def wait(self, timeout: float) -> bool:
+                """Record one wait call and stop immediately after it."""
+                self.wait_calls.append(timeout)
+                self.set()
+                return True
+
+        context = self.__build_context("mfiutil_startup_scan")
+        context.config = {
+            "at_channel": ["21:0;0|6|12|18;*;*;*", "22:0;15;*;*;*"],
+            "event_count": 10,
+            "sleep_period": 30.0,
+            "tool_path": "/usr/sbin/mfiutil",
+        }
+        runtime = MfiutilRuntime(context)
+        stop_event = _StopEvent()
+        runtime._notifications = _Notifications()  # type: ignore[assignment]
+        runtime._stop_event = stop_event  # type: ignore[assignment]
+        runtime._tool_path = "/usr/sbin/mfiutil"
+
+        with patch.object(
+            runtime,
+            "_MfiutilRuntime__detect_controllers",
+            return_value=["/dev/mfi0"],
+        ), patch.object(
+            runtime,
+            "_MfiutilRuntime__diagnose_controller",
+            return_value=False,
+        ) as diagnose_mock:
+            runtime.run()
+
+        diagnose_mock.assert_called_once_with(
+            controller="/dev/mfi0",
+            due_channels=[21, 22],
+        )
+        self.assertEqual(stop_event.wait_calls, [30.0])
+
+    def test_12a_should_deduplicate_diagnostics_within_one_schedule_slot(self) -> None:
+        """Avoid a second pass when startup overlaps the current schedule minute."""
         from plugins.mfiutil.plugin.runtime import MfiutilRuntime
 
         class _Notifications(object):
@@ -1169,7 +1226,12 @@ mfi0 Configuration: 7 arrays, 2 volumes, 0 spares
         with patch.object(
             runtime,
             "_MfiutilRuntime__current_schedule_key",
-            side_effect=["2026-03-26 12:00:1", "2026-03-26 12:00:1", None],
+            side_effect=[
+                "2026-03-26 12:00:1",
+                "2026-03-26 12:00:1",
+                None,
+                None,
+            ],
         ), patch.object(
             runtime,
             "_MfiutilRuntime__detect_controllers",

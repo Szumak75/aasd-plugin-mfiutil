@@ -2,6 +2,22 @@
 
 All notable changes to this plugin repository are documented in this file.
 
+## [0.3.6] - 2026-03-26
+
+### Changed
+- Updated `plugins/mfiutil/plugin/runtime.py` so every plugin start performs an
+  immediate diagnostic pass before waiting for the next `at_channel` window.
+- Kept minute-level schedule deduplication so a startup scan that lands inside
+  an already matching `at_channel` minute does not trigger a duplicate pass in
+  the same slot.
+- Added regression coverage in `plugins/mfiutil/tests/test_runtime.py` for the
+  immediate startup scan and the no-duplicate overlap case.
+- Updated `plugins/mfiutil/README.md` to document immediate startup diagnostics
+  and the resulting behavior after daemon restart or `SIGHUP` reload.
+
+### Versioning
+- Bumped local plugin version to `0.3.6` in `plugins/mfiutil/plugin/__init__.py`.
+
 ## [0.3.5] - 2026-03-26
 
 ### Changed

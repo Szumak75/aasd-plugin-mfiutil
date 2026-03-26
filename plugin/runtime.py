@@ -204,44 +204,18 @@ class MfiutilRuntime(Thread, ThPluginMixin):
             state=PluginState.RUNNING,
             started_at=int(time()),
         )
+        startup_channels = self.__startup_channels()
+        if startup_channels:
+            self.__run_diagnostics_pass(due_channels=startup_channels)
+            self._last_schedule_key = self.__current_schedule_key(
+                due_channels=notifications.due_channels()
+            )
         while not stop_event.is_set():
             due_channels: List[int] = notifications.due_channels()
             schedule_key = self.__current_schedule_key(due_channels=due_channels)
             if due_channels and schedule_key != self._last_schedule_key:
                 self._last_schedule_key = schedule_key
-                controllers = self.__detect_controllers()
-                if not controllers:
-                    context.logger.message_warning = (
-                        "No supported mfi(4)/mrsas(4) controller devices found."
-                    )
-                    self.__update_health(
-                        healthy=False,
-                        message="No supported RAID controllers detected.",
-                    )
-                else:
-                    any_critical = False
-                    for controller in controllers:
-                        if stop_event.is_set():
-                            break
-                        try:
-                            if self.__diagnose_controller(
-                                controller=controller,
-                                due_channels=due_channels,
-                            ):
-                                any_critical = True
-                        except Exception as ex:
-                            context.logger.message_warning = (
-                                f"Controller '{controller}' diagnostic failed: {ex}"
-                            )
-                            any_critical = True
-                    self.__update_health(
-                        healthy=not any_critical,
-                        message=(
-                            "Controller diagnostics completed without critical findings."
-                            if not any_critical
-                            else "Controller diagnostics detected critical findings."
-                        ),
-                    )
+                self.__run_diagnostics_pass(due_channels=due_channels)
             elif not due_channels:
                 self._last_schedule_key = None
             stop_event.wait(self.__sleep_period())
@@ -465,6 +439,28 @@ class MfiutilRuntime(Thread, ThPluginMixin):
             set(glob("/dev/mfi[0-9]*")) | set(glob("/dev/mrsas[0-9]*"))
         )
         return controllers
+
+    def __configured_channels(self) -> List[int]:
+        """Return all notification channels configured for startup delivery.
+
+        ### Returns:
+        List[int] - Unique configured dispatcher channel identifiers.
+        """
+        context: Optional[PluginContext] = self._context
+        if context is None:
+            raise ValueError("Plugin context is not initialized.")
+        out: List[int] = []
+        raw_channels: Any = context.config.get(PluginCommonKeys.AT_CHANNEL, [])
+        if not isinstance(raw_channels, list):
+            return out
+        for item in raw_channels:
+            channel_str = str(item).split(":", 1)[0].strip()
+            if not channel_str:
+                continue
+            channel = int(channel_str)
+            if channel not in out:
+                out.append(channel)
+        return out
 
     def __diagnose_controller(self, controller: str, due_channels: List[int]) -> bool:
         """Run one full diagnostic pass for a selected controller.
@@ -692,6 +688,50 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         channels: str = ",".join(str(item) for item in sorted(due_channels))
         return f"{timestamp}:{channels}"
 
+    def __run_diagnostics_pass(self, due_channels: List[int]) -> None:
+        """Run one diagnostic pass for all detected controllers.
+
+        ### Arguments:
+        * due_channels: List[int] - Dispatcher channels used for this pass.
+        """
+        context: Optional[PluginContext] = self._context
+        stop_event: Optional[Event] = self._stop_event
+        if context is None or stop_event is None:
+            raise ValueError("Runtime dependencies are not initialized.")
+        controllers = self.__detect_controllers()
+        if not controllers:
+            context.logger.message_warning = (
+                "No supported mfi(4)/mrsas(4) controller devices found."
+            )
+            self.__update_health(
+                healthy=False,
+                message="No supported RAID controllers detected.",
+            )
+            return None
+        any_critical = False
+        for controller in controllers:
+            if stop_event.is_set():
+                break
+            try:
+                if self.__diagnose_controller(
+                    controller=controller,
+                    due_channels=due_channels,
+                ):
+                    any_critical = True
+            except Exception as ex:
+                context.logger.message_warning = (
+                    f"Controller '{controller}' diagnostic failed: {ex}"
+                )
+                any_critical = True
+        self.__update_health(
+            healthy=not any_critical,
+            message=(
+                "Controller diagnostics completed without critical findings."
+                if not any_critical
+                else "Controller diagnostics detected critical findings."
+            ),
+        )
+
     def __sleep_period(self) -> float:
         """Return the configured poll interval with a safe default.
 
@@ -705,6 +745,14 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         if isinstance(raw_value, (int, float)) and float(raw_value) > 0.0:
             return float(raw_value)
         return 5.0
+
+    def __startup_channels(self) -> List[int]:
+        """Return the channel set used for the immediate startup scan.
+
+        ### Returns:
+        List[int] - Configured dispatcher channels for the startup pass.
+        """
+        return self.__configured_channels()
 
     def __log_battery_state(self, controller: str, battery_state: str) -> None:
         """Write the battery state to plugin logs without channel notifications.

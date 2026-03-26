@@ -32,7 +32,8 @@ The current implementation:
 - parses realistic FreeBSD `mfiutil` output variants seen across controller and
   system versions, including `/dev/mfiX` headers and mixed SATA/SAS/SCSI drive
   descriptions,
-- runs diagnostics according to `AT_CHANNEL`,
+- runs one diagnostic pass immediately after plugin startup and then continues
+  according to `AT_CHANNEL`,
 - logs adapter and configuration summaries for each detected controller,
 - evaluates `show volumes` and emits alerts when one or more volumes are not in
   `OPTIMAL` state,
@@ -66,7 +67,11 @@ The plugin currently exposes the following configuration fields:
 The runtime checks the configured schedule in a polling loop and deduplicates
 execution per scheduled minute. This means a value such as
 `at_channel = ['1:0;0|6|12|18;*;*;*']` is executed at most once per matching
-minute even when `sleep_period` is shorter than sixty seconds.
+minute even when `sleep_period` is shorter than sixty seconds. In addition, the
+plugin performs one immediate diagnostic pass right after startup, using the
+configured `at_channel` destinations without waiting for the next matching
+window. Because daemon restart and `SIGHUP` reload recreate the plugin runtime,
+they also trigger this immediate startup diagnostic pass.
 
 ## Notification Rules
 
