@@ -2,6 +2,23 @@
 
 All notable changes to this plugin repository are documented in this file.
 
+## [0.3.5] - 2026-03-26
+
+### Changed
+- Added per-minute schedule deduplication in
+  `plugins/mfiutil/plugin/runtime.py` so one matching `at_channel` slot triggers
+  at most one diagnostic pass even when the polling interval is shorter than
+  sixty seconds.
+- Changed `sleep_period` in `plugins/mfiutil/load.py` to an optional setting
+  with a runtime default of `5.0` seconds.
+- Added regression coverage in `plugins/mfiutil/tests/test_runtime.py` for
+  schedule-slot deduplication and the default sleep-period fallback.
+- Updated `plugins/mfiutil/README.md` to document the deduplicated schedule
+  behavior and the optional `sleep_period`.
+
+### Versioning
+- Bumped local plugin version to `0.3.5` in `plugins/mfiutil/plugin/__init__.py`.
+
 ## [0.3.4] - 2026-03-25
 
 ### Changed

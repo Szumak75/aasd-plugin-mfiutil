@@ -42,9 +42,12 @@ def get_plugin_spec() -> PluginSpec:
             PluginConfigField(
                 name=PluginCommonKeys.SLEEP_PERIOD,
                 field_type=float,
-                default=30.0,
-                required=True,
-                description="Polling interval in seconds used between schedule checks.",
+                default=5.0,
+                required=False,
+                description=(
+                    "Optional polling interval in seconds used between schedule "
+                    "checks. Defaults to 5.0 seconds."
+                ),
             ),
             PluginConfigField(
                 name=Keys.EVENT_COUNT,

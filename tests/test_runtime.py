@@ -12,6 +12,7 @@ import unittest
 
 from pathlib import Path
 from queue import Queue
+from threading import Event
 from types import ModuleType
 from typing import List
 from unittest.mock import MagicMock, patch
@@ -91,6 +92,7 @@ class TestMfiutilRuntime(unittest.TestCase):
         MfiutilRuntime._controller_event_cursor = {}
         MfiutilRuntime._controller_event_limit_cache = {}
         MfiutilRuntime._disk_status_cache = {}
+        MfiutilRuntime._last_schedule_key = None
         MfiutilRuntime._locate_flags = {}
         MfiutilRuntime._rebuild_progress_cache = {}
         MfiutilRuntime._volume_state_cache = {}
@@ -1117,6 +1119,112 @@ mfi0 Configuration: 7 arrays, 2 volumes, 0 spares
         self.assertFalse(result)
         self.assertFalse(context.dispatcher.publish.called)
         self.assertTrue(any("DRIVE/FATAL" in item for item in logger.info_messages))
+
+    def test_12_should_deduplicate_diagnostics_within_one_schedule_slot(self) -> None:
+        """Run diagnostics only once within the same matching minute."""
+        from plugins.mfiutil.plugin.runtime import MfiutilRuntime
+
+        class _Notifications(object):
+            """Provide deterministic due-channel responses."""
+
+            has_schedule: bool = True
+
+            def __init__(self) -> None:
+                """Initialize the response sequence."""
+                self._items: List[List[int]] = [[1], [1], []]
+
+            def due_channels(self) -> List[int]:
+                """Return one configured response item."""
+                if not self._items:
+                    return []
+                return self._items.pop(0)
+
+        class _StopEvent(Event):
+            """Provide a controllable stop event stub."""
+
+            def __init__(self) -> None:
+                """Initialize the stop event stub."""
+                super().__init__()
+                self.wait_calls: List[float] = []
+
+            def wait(self, timeout: float) -> bool:
+                """Record the wait call and stop after three iterations."""
+                self.wait_calls.append(timeout)
+                if len(self.wait_calls) >= 3:
+                    self.set()
+                return self.is_set()
+
+        context = self.__build_context("mfiutil_schedule_slot")
+        context.config = {
+            "at_channel": ["1:0;0|6|12|18;*;*;*"],
+            "event_count": 10,
+            "sleep_period": 30.0,
+            "tool_path": "/usr/sbin/mfiutil",
+        }
+        runtime = MfiutilRuntime(context)
+        runtime._notifications = _Notifications()  # type: ignore[assignment]
+        runtime._stop_event = _StopEvent()  # type: ignore[assignment]
+        runtime._tool_path = "/usr/sbin/mfiutil"
+
+        with patch.object(
+            runtime,
+            "_MfiutilRuntime__current_schedule_key",
+            side_effect=["2026-03-26 12:00:1", "2026-03-26 12:00:1", None],
+        ), patch.object(
+            runtime,
+            "_MfiutilRuntime__detect_controllers",
+            return_value=["/dev/mfi0"],
+        ), patch.object(
+            runtime,
+            "_MfiutilRuntime__diagnose_controller",
+            return_value=False,
+        ) as diagnose_mock:
+            runtime.run()
+
+        self.assertEqual(diagnose_mock.call_count, 1)
+
+    def test_13_should_use_default_sleep_period_when_config_value_is_missing(self) -> None:
+        """Fall back to the built-in sleep period when config omits the field."""
+        from plugins.mfiutil.plugin.runtime import MfiutilRuntime
+
+        class _Notifications(object):
+            """Provide deterministic due-channel responses."""
+
+            has_schedule: bool = True
+
+            def due_channels(self) -> List[int]:
+                """Return no due channels."""
+                return []
+
+        class _StopEvent(Event):
+            """Provide a controllable stop event stub."""
+
+            def __init__(self) -> None:
+                """Initialize the stop event stub."""
+                super().__init__()
+                self.wait_calls: List[float] = []
+
+            def wait(self, timeout: float) -> bool:
+                """Record one wait call and stop immediately after it."""
+                self.wait_calls.append(timeout)
+                self.set()
+                return True
+
+        context = self.__build_context("mfiutil_default_sleep")
+        context.config = {
+            "at_channel": ["1:0;0|6|12|18;*;*;*"],
+            "event_count": 10,
+            "tool_path": "/usr/sbin/mfiutil",
+        }
+        runtime = MfiutilRuntime(context)
+        stop_event = _StopEvent()
+        runtime._notifications = _Notifications()  # type: ignore[assignment]
+        runtime._stop_event = stop_event  # type: ignore[assignment]
+        runtime._tool_path = "/usr/sbin/mfiutil"
+
+        runtime.run()
+
+        self.assertEqual(stop_event.wait_calls, [5.0])
 
 
 # #[EOF]#######################################################################

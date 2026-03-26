@@ -14,6 +14,7 @@ import re
 import shutil
 import subprocess
 
+from datetime import datetime
 from glob import glob
 from threading import Event, Thread
 from time import time
@@ -77,6 +78,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
     _locate_flags: ClassVar[Dict[str, bool]] = {}
     _notifications: Optional[NotificationScheduler] = None
     _battery_state_cache: ClassVar[Dict[str, str]] = {}
+    _last_schedule_key: Optional[str] = None
     _rebuild_progress_cache: ClassVar[Dict[str, int]] = {}
     _tool_path: Optional[str] = None
     _volume_state_cache: ClassVar[Dict[str, str]] = {}
@@ -95,6 +97,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         self._notifications = NotificationScheduler.from_config(context.config)
         self._state = PluginStateSnapshot(state=PluginState.CREATED)
         self._stop_event = Event()
+        self._last_schedule_key = None
         self._tool_path = None
 
     # #[PUBLIC METHODS]################################################################
@@ -203,7 +206,9 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         )
         while not stop_event.is_set():
             due_channels: List[int] = notifications.due_channels()
-            if due_channels:
+            schedule_key = self.__current_schedule_key(due_channels=due_channels)
+            if due_channels and schedule_key != self._last_schedule_key:
+                self._last_schedule_key = schedule_key
                 controllers = self.__detect_controllers()
                 if not controllers:
                     context.logger.message_warning = (
@@ -237,7 +242,9 @@ class MfiutilRuntime(Thread, ThPluginMixin):
                             else "Controller diagnostics detected critical findings."
                         ),
                     )
-            stop_event.wait(float(context.config[PluginCommonKeys.SLEEP_PERIOD]))
+            elif not due_channels:
+                self._last_schedule_key = None
+            stop_event.wait(self.__sleep_period())
 
         state: Optional[PluginStateSnapshot] = self._state
         self._state = PluginStateSnapshot(
@@ -669,6 +676,35 @@ class MfiutilRuntime(Thread, ThPluginMixin):
             message.messages = lines
             context.dispatcher.publish(message)
         context.logger.message_warning = " | ".join(lines)
+
+    def __current_schedule_key(self, due_channels: List[int]) -> Optional[str]:
+        """Return a deduplication key for the current scheduled minute.
+
+        ### Arguments:
+        * due_channels: List[int] - Dispatcher channels currently due.
+
+        ### Returns:
+        Optional[str] - Current schedule key or `None` when nothing is due.
+        """
+        if not due_channels:
+            return None
+        timestamp: str = datetime.now().strftime("%Y-%m-%d %H:%M")
+        channels: str = ",".join(str(item) for item in sorted(due_channels))
+        return f"{timestamp}:{channels}"
+
+    def __sleep_period(self) -> float:
+        """Return the configured poll interval with a safe default.
+
+        ### Returns:
+        float - Poll interval in seconds.
+        """
+        context: Optional[PluginContext] = self._context
+        if context is None:
+            return 5.0
+        raw_value: Any = context.config.get(PluginCommonKeys.SLEEP_PERIOD, 5.0)
+        if isinstance(raw_value, (int, float)) and float(raw_value) > 0.0:
+            return float(raw_value)
+        return 5.0
 
     def __log_battery_state(self, controller: str, battery_state: str) -> None:
         """Write the battery state to plugin logs without channel notifications.

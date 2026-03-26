@@ -58,10 +58,15 @@ sequence cursors in class-level storage for repeated diagnostic passes.
 The plugin currently exposes the following configuration fields:
 
 - `at_channel` - cron-like schedule driving diagnostics and channel delivery
-- `sleep_period` - polling interval between schedule checks
+- `sleep_period` - optional polling interval between schedule checks, default `5.0`
 - `event_count` - maximum number of controller events read per low-level event
   fetch request, default `10`
 - `tool_path` - optional explicit path to `mfiutil`
+
+The runtime checks the configured schedule in a polling loop and deduplicates
+execution per scheduled minute. This means a value such as
+`at_channel = ['1:0;0|6|12|18;*;*;*']` is executed at most once per matching
+minute even when `sleep_period` is shorter than sixty seconds.
 
 ## Notification Rules
 
