@@ -82,6 +82,10 @@ Channel notifications are emitted only for:
 - critical drive states requiring operator attention or replacement,
 - rebuild progress updates when the reported percentage changes.
 
+Emitted dispatcher messages also carry `Message.diagnostic_source` with the
+runtime class name so host-side dispatcher warnings can identify the producer
+when a target channel is not registered.
+
 Battery status is written only to plugin logs. Newly detected controller events
 since plugin startup are also written only to plugin logs. Controller adapter
 and configuration summaries are also written only to plugin logs. Controllers

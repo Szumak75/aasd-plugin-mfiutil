@@ -2,6 +2,18 @@
 
 All notable changes to this plugin repository are documented in this file.
 
+## [0.3.7] - 2026-03-27
+
+### Changed
+- Populated `Message.diagnostic_source` in `plugins/mfiutil/plugin/runtime.py`
+  so dispatcher warnings for unregistered channels identify the producing
+  runtime class.
+- Updated `plugins/mfiutil/README.md` to document the dispatcher diagnostic
+  source attached to emitted notifications.
+
+### Versioning
+- Bumped local plugin version to `0.3.7` in `plugins/mfiutil/plugin/__init__.py`.
+
 ## [0.3.6] - 2026-03-26
 
 ### Changed

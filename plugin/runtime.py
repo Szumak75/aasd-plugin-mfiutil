@@ -674,6 +674,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         for channel in due_channels:
             message = Message()
             message.channel = channel
+            message.diagnostic_source = self._c_name
             message.subject = subject
             message.messages = lines
             context.dispatcher.publish(message)
