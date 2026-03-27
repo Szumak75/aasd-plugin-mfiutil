@@ -204,7 +204,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
             state=PluginState.RUNNING,
             started_at=int(time()),
         )
-        startup_channels = self.__startup_channels()
+        startup_channels: List[int] = self.__startup_channels()
         if startup_channels:
             self.__run_diagnostics_pass(due_channels=startup_channels)
             self._last_schedule_key = self.__current_schedule_key(
@@ -212,7 +212,9 @@ class MfiutilRuntime(Thread, ThPluginMixin):
             )
         while not stop_event.is_set():
             due_channels: List[int] = notifications.due_channels()
-            schedule_key = self.__current_schedule_key(due_channels=due_channels)
+            schedule_key: Optional[str] = self.__current_schedule_key(
+                due_channels=due_channels
+            )
             if due_channels and schedule_key != self._last_schedule_key:
                 self._last_schedule_key = schedule_key
                 self.__run_diagnostics_pass(due_channels=due_channels)
@@ -316,17 +318,15 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         context: Optional[PluginContext] = self._context
         if context is None:
             raise ValueError("Plugin context is not initialized.")
-        drive_ref = drive.get("slot", "") or drive.get("id", "")
+        drive_ref: str = drive.get("slot", "") or drive.get("id", "")
         if not drive_ref:
-            context.logger.message_warning = (
-                f"Cannot change locate flag for controller '{controller}' without drive identifier."
-            )
+            context.logger.message_warning = f"Cannot change locate flag for controller '{controller}' without drive identifier."
             return None
         self.__run_mfiutil(
             controller=controller,
             args=["locate", drive_ref, "on" if enable else "off"],
         )
-        key = self.__normalize_disk_key(controller=controller, drive=drive)
+        key: str = self.__normalize_disk_key(controller=controller, drive=drive)
         self.__current_locate_states()[key] = enable
         context.logger.message_info = (
             f"Controller '{controller}' drive '{drive_ref}' locate set to "
@@ -422,11 +422,9 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         ### Raises:
         * ValueError: If the device path does not contain a supported unit number.
         """
-        match = re.match(r"^/dev/(?:mfi|mrsas)(\d+)$", controller)
+        match: Optional[re.Match[str]] = re.match(r"^/dev/(?:mfi|mrsas)(\d+)$", controller)
         if match is None:
-            raise ValueError(
-                f"Unsupported controller device path '{controller}'."
-            )
+            raise ValueError(f"Unsupported controller device path '{controller}'.")
         return int(match.group(1))
 
     def __detect_controllers(self) -> List[str]:
@@ -454,10 +452,10 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         if not isinstance(raw_channels, list):
             return out
         for item in raw_channels:
-            channel_str = str(item).split(":", 1)[0].strip()
+            channel_str: str = str(item).split(":", 1)[0].strip()
             if not channel_str:
                 continue
-            channel = int(channel_str)
+            channel: int = int(channel_str)
             if channel not in out:
                 out.append(channel)
         return out
@@ -476,21 +474,29 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         if context is None:
             raise ValueError("Plugin context is not initialized.")
 
-        adapter_output = self.__run_mfiutil(controller=controller, args=["show", "adapter"])
-        battery_output = self.__run_mfiutil(controller=controller, args=["show", "battery"])
-        config_output = self.__run_mfiutil(controller=controller, args=["show", "config"])
-        volumes_output = self.__run_mfiutil(controller=controller, args=["show", "volumes"])
-        drives_output = self.__run_mfiutil(
+        adapter_output: str = self.__run_mfiutil(
+            controller=controller, args=["show", "adapter"]
+        )
+        battery_output: str = self.__run_mfiutil(
+            controller=controller, args=["show", "battery"]
+        )
+        config_output: str = self.__run_mfiutil(
+            controller=controller, args=["show", "config"]
+        )
+        volumes_output: str = self.__run_mfiutil(
+            controller=controller, args=["show", "volumes"]
+        )
+        drives_output: str = self.__run_mfiutil(
             controller=controller,
             args=["-e", "show", "drives"],
         )
-        progress_output = self.__run_mfiutil(
+        progress_output: str = self.__run_mfiutil(
             controller=controller,
             args=["-e", "show", "progress"],
         )
 
-        adapter_summary = self.__parse_adapter(output=adapter_output)
-        config_summary = self.__parse_config(output=config_output)
+        adapter_summary: str = self.__parse_adapter(output=adapter_output)
+        config_summary: str = self.__parse_config(output=config_output)
         if adapter_summary or config_summary:
             summary_parts: List[str] = []
             if adapter_summary:
@@ -500,8 +506,8 @@ class MfiutilRuntime(Thread, ThPluginMixin):
             context.logger.message_info = (
                 f"Controller '{controller}' summary: {', '.join(summary_parts)}"
             )
-        battery_info = self.__parse_battery(output=battery_output)
-        events = self.__load_events(controller=controller)
+        battery_info: Dict[str, str] = self.__parse_battery(output=battery_output)
+        events: List[Tuple[int, str]] = self.__load_events(controller=controller)
         self.__log_battery_state(
             controller=controller,
             battery_state=battery_info["summary"],
@@ -512,20 +518,20 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         )
 
         any_critical = False
-        drives = self.__parse_drives(output=drives_output)
-        progress_map = self.__parse_progress(
+        drives: List[Dict[str, str]] = self.__parse_drives(output=drives_output)
+        progress_map: Dict[str, int] = self.__parse_progress(
             controller=controller,
             output=progress_output,
         )
-        disk_states = self.__current_disk_states()
-        locate_states = self.__current_locate_states()
-        rebuild_states = self.__current_rebuild_states()
-        volume_states = self.__current_volume_states()
-        battery_states = self.__current_battery_states()
-        volumes = self.__parse_volumes(output=volumes_output)
-        battery_key = f"{context.instance_name}:{controller}"
-        battery_state = battery_info.get("state", "")
-        previous_battery_state = battery_states.get(battery_key)
+        disk_states: Dict[str, str] = self.__current_disk_states()
+        locate_states: Dict[str, bool] = self.__current_locate_states()
+        rebuild_states: Dict[str, int] = self.__current_rebuild_states()
+        volume_states: Dict[str, str] = self.__current_volume_states()
+        battery_states: Dict[str, str] = self.__current_battery_states()
+        volumes: List[Dict[str, str]] = self.__parse_volumes(output=volumes_output)
+        battery_key: str = f"{context.instance_name}:{controller}"
+        battery_state: str = battery_info.get("state", "")
+        previous_battery_state: Optional[str] = battery_states.get(battery_key)
 
         if battery_state in ("degraded", "failed"):
             any_critical = True
@@ -548,10 +554,10 @@ class MfiutilRuntime(Thread, ThPluginMixin):
             battery_states[battery_key] = battery_state
 
         for volume in volumes:
-            volume_label = volume.get("id", "unknown")
-            volume_key = f"{context.instance_name}:{controller}:{volume_label}"
-            current_state = volume.get("state", "")
-            previous_state = volume_states.get(volume_key)
+            volume_label: str = volume.get("id", "unknown")
+            volume_key: str = f"{context.instance_name}:{controller}:{volume_label}"
+            current_state: str = volume.get("state", "")
+            previous_state: Optional[str] = volume_states.get(volume_key)
             if current_state and current_state != "OPTIMAL":
                 any_critical = True
                 if previous_state != current_state:
@@ -574,12 +580,12 @@ class MfiutilRuntime(Thread, ThPluginMixin):
                 volume_states[volume_key] = current_state
 
         for drive in drives:
-            current_status = drive.get("status", "")
-            drive_label = drive.get("slot", "") or drive.get("id", "") or "unknown"
-            disk_key = self.__normalize_disk_key(controller=controller, drive=drive)
-            previous_status = disk_states.get(disk_key)
-            progress = progress_map.get(disk_key)
-            desired_locate = current_status != "ONLINE"
+            current_status: str = drive.get("status", "")
+            drive_label: str = drive.get("slot", "") or drive.get("id", "") or "unknown"
+            disk_key: str = self.__normalize_disk_key(controller=controller, drive=drive)
+            previous_status: Optional[str] = disk_states.get(disk_key)
+            progress: Optional[int] = progress_map.get(disk_key)
+            desired_locate: bool = current_status != "ONLINE"
 
             if current_status in self._CRITICAL_STATUSES:
                 any_critical = True
@@ -638,10 +644,10 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         context: Optional[PluginContext] = self._context
         if context is None:
             raise ValueError("Plugin context is not initialized.")
-        configured = str(context.config.get(Keys.TOOL_PATH, "")).strip()
+        configured: str = str(context.config.get(Keys.TOOL_PATH, "")).strip()
         if configured:
             return configured
-        discovered = shutil.which("mfiutil")
+        discovered: Optional[str] = shutil.which("mfiutil")
         if discovered:
             return discovered
         for candidate in self._CANDIDATE_PATHS:
@@ -698,7 +704,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         stop_event: Optional[Event] = self._stop_event
         if context is None or stop_event is None:
             raise ValueError("Runtime dependencies are not initialized.")
-        controllers = self.__detect_controllers()
+        controllers: List[str] = self.__detect_controllers()
         if not controllers:
             context.logger.message_warning = (
                 "No supported mfi(4)/mrsas(4) controller devices found."
@@ -708,7 +714,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
                 message="No supported RAID controllers detected.",
             )
             return None
-        any_critical = False
+        any_critical: bool = False
         for controller in controllers:
             if stop_event.is_set():
                 break
@@ -785,13 +791,13 @@ class MfiutilRuntime(Thread, ThPluginMixin):
             raise ValueError("Plugin context is not initialized.")
         if not events:
             return None
-        cursor_key = f"{context.instance_name}:{controller}"
-        event_cursors = self.__current_event_cursors()
-        max_seq = max(item[0] for item in events)
+        cursor_key: str = f"{context.instance_name}:{controller}"
+        event_cursors: Dict[str, int] = self.__current_event_cursors()
+        max_seq: int = max(item[0] for item in events)
         if cursor_key not in event_cursors:
             event_cursors[cursor_key] = max_seq
             return None
-        previous = event_cursors[cursor_key]
+        previous: int = event_cursors[cursor_key]
         for seq, message in sorted(events, key=lambda item: item[0]):
             if seq > previous:
                 context.logger.message_info = (
@@ -812,9 +818,9 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         context: Optional[PluginContext] = self._context
         if context is None:
             raise ValueError("Plugin context is not initialized.")
-        configured_limit = int(context.config[Keys.EVENT_COUNT])
-        event_limits = self.__current_event_limits()
-        limit = event_limits.get(
+        configured_limit: int = int(context.config[Keys.EVENT_COUNT])
+        event_limits: Dict[str, int] = self.__current_event_limits()
+        limit: int = event_limits.get(
             f"{context.instance_name}:{controller}",
             configured_limit,
         )
@@ -839,7 +845,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
                         f"Controller '{controller}' event history query failed: {ex}"
                     )
                     return []
-                next_limit = self.__next_event_limit(limit)
+                next_limit: Optional[int] = self.__next_event_limit(limit)
                 if next_limit is None:
                     context.logger.message_warning = (
                         f"Controller '{controller}' event history query skipped: {ex}"
@@ -865,7 +871,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         context: Optional[PluginContext] = self._context
         if context is None:
             raise ValueError("Plugin context is not initialized.")
-        drive_ref = drive.get("slot", "") or drive.get("id", "") or drive.get("raw", "")
+        drive_ref: str = drive.get("slot", "") or drive.get("id", "") or drive.get("raw", "")
         return f"{context.instance_name}:{controller}:{drive_ref}"
 
     def __next_event_limit(self, current_limit: int) -> Optional[int]:
@@ -880,7 +886,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         if current_limit <= 1:
             return None
         if current_limit > 10:
-            next_limit = current_limit - 5
+            next_limit: int = current_limit - 5
             if next_limit < 10:
                 return 10
             return next_limit
@@ -895,7 +901,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         ### Returns:
         Dict[str, str] - Parsed battery summary and normalized state.
         """
-        normalized_output = output.strip()
+        normalized_output: str = output.strip()
         if normalized_output and "no battery present" in normalized_output.lower():
             return {
                 "state": "not_present",
@@ -904,7 +910,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
 
         values: Dict[str, str] = {}
         for raw_line in output.splitlines():
-            line = raw_line.strip()
+            line: str = raw_line.strip()
             if ":" not in line:
                 continue
             key, value = line.split(":", 1)
@@ -922,8 +928,8 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         if "Next learn time" in values:
             parts.append(f"next_learn={values['Next learn time']}")
 
-        health = values.get("State of Health", "").strip().lower()
-        state = "ok"
+        health: str = values.get("State of Health", "").strip().lower()
+        state: str = "ok"
         if health == "bad":
             state = "failed"
 
@@ -943,7 +949,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         """
         values: Dict[str, str] = {}
         for raw_line in output.splitlines():
-            line = raw_line.strip()
+            line: str = raw_line.strip()
             if ":" not in line:
                 continue
             key, value = line.split(":", 1)
@@ -969,7 +975,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         str - Short configuration summary.
         """
         for raw_line in output.splitlines():
-            line = raw_line.strip()
+            line: str = raw_line.strip()
             if not line or "configuration:" not in line.lower():
                 continue
             _, config = line.split(":", 1)
@@ -987,24 +993,28 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         """
         out: List[Dict[str, str]] = []
         for raw_line in output.splitlines():
-            line = raw_line.strip()
+            line: str = raw_line.strip()
             if not line:
                 continue
-            status = ""
-            uppercase = line.upper()
+            status: str = ""
+            uppercase: str = line.upper()
             for token in self._STATUS_TOKENS:
                 if token in uppercase:
                     status = token
                     break
             if not status:
                 continue
-            device_match = re.search(r"^\s*(\d+)\b", raw_line)
-            slot_match = re.search(r"\b(?:E\d+:)?S\d+\b|\b\d+:\d+\b", raw_line, re.IGNORECASE)
+            device_match: Optional[re.Match[str]]  = re.search(r"^\s*(\d+)\b", raw_line)
+            slot_match: Optional[re.Match[str]] = re.search(
+                r"\b(?:E\d+:)?S\d+\b|\b\d+:\d+\b", raw_line, re.IGNORECASE
+            )
             out.append(
                 {
                     "id": device_match.group(1) if device_match is not None else "",
                     "raw": line,
-                    "slot": slot_match.group(0).upper() if slot_match is not None else "",
+                    "slot": (
+                        slot_match.group(0).upper() if slot_match is not None else ""
+                    ),
                     "status": status,
                 }
             )
@@ -1021,10 +1031,10 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         """
         out: List[Tuple[int, str]] = []
         for raw_line in output.splitlines():
-            line = raw_line.strip()
+            line: str = raw_line.strip()
             if not line:
                 continue
-            match = re.match(r"^(\d+)\s+(.*\S)\s*$", line)
+            match: Optional[re.Match[str]] = re.match(r"^(\d+)\s+(.*\S)\s*$", line)
             if match is None:
                 continue
             out.append((int(match.group(1)), match.group(2)))
@@ -1044,17 +1054,19 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         context: Optional[PluginContext] = self._context
         if context is None:
             raise ValueError("Plugin context is not initialized.")
-        instance_name = context.instance_name
+        instance_name: str = context.instance_name
         for raw_line in output.splitlines():
-            line = raw_line.strip()
+            line: str = raw_line.strip()
             if not line or "rebuild" not in line.lower():
                 continue
-            progress_match = re.search(r"(\d{1,3})%", line)
+            progress_match: Optional[re.Match[str]] = re.search(r"(\d{1,3})%", line)
             if progress_match is None:
                 continue
-            slot_match = re.search(r"\b(?:E\d+:)?S\d+\b|\b\d+:\d+\b", raw_line, re.IGNORECASE)
-            device_match = re.search(r"\bdrive\s+(\d+)\b", raw_line, re.IGNORECASE)
-            drive_ref = ""
+            slot_match: Optional[re.Match[str]] = re.search(
+                r"\b(?:E\d+:)?S\d+\b|\b\d+:\d+\b", raw_line, re.IGNORECASE
+            )
+            device_match: Optional[re.Match[str]] = re.search(r"\bdrive\s+(\d+)\b", raw_line, re.IGNORECASE)
+            drive_ref: str = ""
             if slot_match is not None:
                 drive_ref = slot_match.group(0).upper()
             elif device_match is not None:
@@ -1077,10 +1089,10 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         """
         out: List[Dict[str, str]] = []
         for raw_line in output.splitlines():
-            line = raw_line.strip()
+            line: str = raw_line.strip()
             if not line or line.startswith("Id ") or "Volumes:" in line:
                 continue
-            match = re.match(
+            match: Optional[re.Match[str]] = re.match(
                 r"^(mfid\d+)\s+\(\s*([^)]+)\)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)(?:\s+(.*))?$",
                 line,
             )
@@ -1114,15 +1126,15 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         """
         if self._tool_path is None:
             raise RuntimeError("mfiutil command path is not initialized.")
-        unit = self.__controller_unit(controller)
-        proc = subprocess.run(
+        unit: int = self.__controller_unit(controller)
+        proc: subprocess.CompletedProcess[str] = subprocess.run(
             [self._tool_path, "-u", str(unit)] + args,
             capture_output=True,
             check=False,
             text=True,
         )
         if proc.returncode != 0:
-            error_text = proc.stderr.strip() or proc.stdout.strip() or "unknown error"
+            error_text: str = proc.stderr.strip() or proc.stdout.strip() or "unknown error"
             raise RuntimeError(
                 f"mfiutil command failed for controller '{controller}': {error_text}"
             )
@@ -1135,7 +1147,7 @@ class MfiutilRuntime(Thread, ThPluginMixin):
         * healthy: bool - `True` when diagnostics are healthy.
         * message: str - Health summary message.
         """
-        now = int(time())
+        now: int = int(time())
         self._health = PluginHealthSnapshot(
             health=PluginHealth.HEALTHY if healthy else PluginHealth.DEGRADED,
             last_error_at=None if healthy else now,
